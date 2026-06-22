@@ -1,0 +1,33 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: forbid-cross-namespace-restore
+policies:
+  - ../forbid-cross-namespace-restore.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: forbid-cross-namespace-restore
+    rule: target-must-match-source
+    kind: RestoreAction
+    resources:
+      - good-same-namespace-restore
+    result: pass
+  - policy: forbid-cross-namespace-restore
+    rule: target-must-match-source
+    kind: RestoreAction
+    resources:
+      - good-restore-in-place
+    result: pass
+  - policy: forbid-cross-namespace-restore
+    rule: target-must-match-source
+    kind: RestoreAction
+    resources:
+      - good-cross-namespace-allowed
+    result: pass
+  - policy: forbid-cross-namespace-restore
+    rule: target-must-match-source
+    kind: RestoreAction
+    resources:
+      - bad-cross-namespace-restore
+    result: fail

@@ -1,0 +1,70 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-exclusions
+  annotations:
+    policies.kyverno.io/title: Require Resource Exclusions on Backup
+    policies.kyverno.io/category: Veeam Kasten
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Policy
+    kyverno.io/kyverno-version: 1.12.1
+    policies.kyverno.io/minversion: 1.12.0
+    kyverno.io/kubernetes-version: "1.24-1.30"
+    veeamkasten.dev/scope: "A"
+    veeamkasten.dev/availability: available-v8
+    veeamkasten.dev/status: unverified
+    policies.kyverno.io/description: >-
+      Require every Veeam Kasten Policy that contains a backup action to declare
+      resource exclusion filters covering a configurable sensitive-resource
+      list. This prevents sensitive resource types (Secrets by default) from
+      being captured in backups unless explicitly intended.
+      The sensitive list is configurable via the `sensitiveResources` context
+      variable below (or by replacing it with a ConfigMap apiCall - see README).
+      STATUS: unverified - the filter path
+      `spec.actions[].backupParameters.filters.excludeResources[].resource` is
+      taken from documentation/upstream and has NOT been confirmed with
+      `oc explain policies.config.kio.kasten.io --recursive`. The exact filter
+      shape (resource/group/version keys) varies by Kasten version.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: backup-must-exclude-sensitive-resources
+      match:
+        any:
+          - resources:
+              kinds:
+                - config.kio.kasten.io/v1alpha1/Policy
+              operations:
+                - CREATE
+                - UPDATE
+      # Only Policies that actually take a backup action are in scope.
+      preconditions:
+        all:
+          - key: "{{ length(request.object.spec.actions[?action=='backup']) }}"
+            operator: GreaterThan
+            value: 0
+      context:
+        # CONFIGURABLE: edit this default list, or replace this block with a
+        # ConfigMap lookup, e.g.:
+        #   - name: sensitiveResources
+        #     apiCall:
+        #       urlPath: "/api/v1/namespaces/kyverno/configmaps/kasten-sensitive-resources"
+        #       jmesPath: "data.resources | parse_json(@)"
+        - name: sensitiveResources
+          variable:
+            value:
+              - secrets
+      validate:
+        message: >-
+          Each Policy with a backup action must exclude all sensitive resource
+          types via spec.actions[].backupParameters.filters.excludeResources.
+          Missing exclusions for the configured sensitive-resource list.
+        foreach:
+          - list: "sensitiveResources"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ element }}"
+                    operator: AnyNotIn
+                    value: "{{ request.object.spec.actions[].backupParameters.filters.excludeResources[].resource }}"

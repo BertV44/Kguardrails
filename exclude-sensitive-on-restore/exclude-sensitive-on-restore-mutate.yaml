@@ -1,0 +1,84 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: exclude-sensitive-on-restore-mutate
+  annotations:
+    policies.kyverno.io/title: Exclude Sensitive Resources on Restore (Mutate)
+    policies.kyverno.io/category: Veeam Kasten
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: RestoreAction
+    kyverno.io/kyverno-version: 1.12.1
+    policies.kyverno.io/minversion: 1.12.0
+    kyverno.io/kubernetes-version: "1.24-1.30"
+    # SCOPE B: requires Kasten v9.0 admission control on Actions (Preview).
+    veeamkasten.dev/scope: "B"
+    veeamkasten.dev/availability: preview-v9
+    veeamkasten.dev/status: unverified
+    policies.kyverno.io/description: >-
+      Mutate companion to exclude-sensitive-on-restore. Automatically injects a
+      Secrets exclusion into a Veeam Kasten RestoreAction's
+      spec.filters.excludeResources when it is missing, so sensitive resources
+      are not restored even if the user omitted the filter. Existing exclusions
+      are preserved (the entry is appended, not replaced).
+      To exclude additional resource types automatically, extend the injected
+      value(s) below; the validate companion enforces the full configured list.
+      REQUIRES Kasten v9.0 admission control on Actions (Preview).
+      STATUS: unverified - `spec.filters.excludeResources` on RestoreAction has
+      NOT been confirmed with
+      `oc explain restoreactions.actions.kio.kasten.io --recursive`.
+spec:
+  # Mutate policies act at admission; rules run in order.
+  background: false
+  rules:
+    # Case 1: an excludeResources array already exists but does not contain
+    # secrets -> append the secrets entry, preserving existing exclusions.
+    - name: append-secrets-when-list-present
+      match:
+        any:
+          - resources:
+              kinds:
+                - actions.kio.kasten.io/v1alpha1/RestoreAction
+              operations:
+                - CREATE
+                - UPDATE
+      preconditions:
+        all:
+          - key: "{{ length(request.object.spec.filters.excludeResources || `[]`) }}"
+            operator: GreaterThan
+            value: 0
+          - key: secrets
+            operator: AnyNotIn
+            value: "{{ request.object.spec.filters.excludeResources[].resource || `[]` }}"
+      mutate:
+        patchesJson6902: |-
+          - op: add
+            path: "/spec/filters/excludeResources/-"
+            value:
+              group: ""
+              version: v1
+              resource: secrets
+    # Case 2: no excludeResources array (filters absent or excludeResources
+    # empty) -> create it with the secrets entry. Deep-merge preserves any
+    # sibling fields such as filters.includeResources.
+    - name: create-exclusions-when-absent
+      match:
+        any:
+          - resources:
+              kinds:
+                - actions.kio.kasten.io/v1alpha1/RestoreAction
+              operations:
+                - CREATE
+                - UPDATE
+      preconditions:
+        all:
+          - key: "{{ length(request.object.spec.filters.excludeResources || `[]`) }}"
+            operator: Equals
+            value: 0
+      mutate:
+        patchStrategicMerge:
+          spec:
+            filters:
+              excludeResources:
+                - group: ""
+                  version: v1
+                  resource: secrets

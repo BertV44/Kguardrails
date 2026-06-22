@@ -1,0 +1,50 @@
+# Mutate companion tested in isolation (see ../.kyverno-test for the validate
+# rule). Asserts that the secrets exclusion is appended when a list exists and
+# created when absent, and that compliant resources are left untouched (skip).
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: exclude-sensitive-on-restore-mutate
+policies:
+  - ../exclude-sensitive-on-restore-mutate.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: exclude-sensitive-on-restore-mutate
+    rule: append-secrets-when-list-present
+    kind: RestoreAction
+    resources:
+      - bad-restore-missing-secrets
+    patchedResources: patched.yaml
+    result: pass
+  - policy: exclude-sensitive-on-restore-mutate
+    rule: append-secrets-when-list-present
+    kind: RestoreAction
+    resources:
+      - good-restore-excludes-secrets
+    result: skip
+  - policy: exclude-sensitive-on-restore-mutate
+    rule: append-secrets-when-list-present
+    kind: RestoreAction
+    resources:
+      - no-filters-restore
+    result: skip
+  - policy: exclude-sensitive-on-restore-mutate
+    rule: create-exclusions-when-absent
+    kind: RestoreAction
+    resources:
+      - no-filters-restore
+    patchedResources: patched.yaml
+    result: pass
+  - policy: exclude-sensitive-on-restore-mutate
+    rule: create-exclusions-when-absent
+    kind: RestoreAction
+    resources:
+      - good-restore-excludes-secrets
+    result: skip
+  - policy: exclude-sensitive-on-restore-mutate
+    rule: create-exclusions-when-absent
+    kind: RestoreAction
+    resources:
+      - bad-restore-missing-secrets
+    result: skip

@@ -1,0 +1,34 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: deny-immutable-restorepoint-deletion
+policies:
+  - ../deny-immutable-restorepoint-deletion.yaml
+resources:
+  - resources.yaml
+variables: values.yaml
+results:
+  - policy: deny-immutable-restorepoint-deletion
+    rule: deny-immutable-delete
+    kind: RestorePointContent
+    resources:
+      - rpc-immutable-managed
+    result: fail
+  - policy: deny-immutable-restorepoint-deletion
+    rule: deny-immutable-delete
+    kind: RestorePointContent
+    resources:
+      - rpc-mutable-managed
+    result: pass
+  - policy: deny-immutable-restorepoint-deletion
+    rule: deny-immutable-delete
+    kind: RestorePointContent
+    resources:
+      - rpc-manual
+    result: skip
+  - policy: deny-immutable-restorepoint-deletion
+    rule: deny-immutable-delete
+    kind: RestorePoint
+    resources:
+      - rp-immutable-managed
+    result: fail

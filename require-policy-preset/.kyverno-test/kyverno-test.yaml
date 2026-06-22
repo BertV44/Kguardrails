@@ -1,0 +1,33 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-policy-preset
+policies:
+  - ../require-policy-preset.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: require-policy-preset
+    rule: require-preset-ref
+    kind: Policy
+    resources:
+      - good-policy-with-preset
+    result: pass
+  - policy: require-policy-preset
+    rule: require-preset-ref
+    kind: Policy
+    resources:
+      - bad-policy-inline-schedule
+    result: fail
+  - policy: require-policy-preset
+    rule: forbid-inline-schedule-retention
+    kind: Policy
+    resources:
+      - good-policy-with-preset
+    result: pass
+  - policy: require-policy-preset
+    rule: forbid-inline-schedule-retention
+    kind: Policy
+    resources:
+      - bad-policy-inline-schedule
+    result: fail

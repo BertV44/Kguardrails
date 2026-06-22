@@ -1,0 +1,65 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-expiry-on-manual-actions
+  annotations:
+    policies.kyverno.io/title: Require Expiry on Manual Actions
+    policies.kyverno.io/category: Veeam Kasten
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: BackupAction, RunAction
+    kyverno.io/kyverno-version: 1.12.1
+    policies.kyverno.io/minversion: 1.12.0
+    kyverno.io/kubernetes-version: "1.24-1.30"
+    # SCOPE B: requires Kasten v9.0 admission control on Actions (Preview).
+    veeamkasten.dev/scope: "B"
+    veeamkasten.dev/availability: preview-v9
+    veeamkasten.dev/status: unverified
+    policies.kyverno.io/description: >-
+      Require manually created Veeam Kasten BackupAction and RunAction objects to
+      set spec.expiresAt (RFC3339), so ad-hoc restore points are garbage
+      collected and do not accumulate indefinitely. Policy-managed actions are
+      exempt: they are identified by the presence of the
+      `k10.kasten.io/policyName` label and have their lifecycle governed by the
+      owning Policy.
+      REQUIRES Kasten v9.0 admission control on Actions (Preview); without it the
+      API server does not route Actions through the admission webhook.
+      STATUS: unverified - the manual-vs-managed discriminator
+      (`k10.kasten.io/policyName` label) and `spec.expiresAt` have NOT been
+      confirmed with `oc explain backupactions.actions.kio.kasten.io` /
+      `oc explain runactions.actions.kio.kasten.io`. Docs scope the policyName
+      label primarily to ClusterRestorePoint; confirm it also appears (or is
+      absent) on manual Actions before enforcing.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: manual-action-must-expire
+      match:
+        any:
+          - resources:
+              kinds:
+                - actions.kio.kasten.io/v1alpha1/BackupAction
+                - actions.kio.kasten.io/v1alpha1/RunAction
+              operations:
+                - CREATE
+                - UPDATE
+      context:
+        # Resolve the policy-managed marker safely; absent labels -> "".
+        - name: policyName
+          variable:
+            jmesPath: 'request.object.metadata.labels."k10.kasten.io/policyName"'
+            default: ""
+      # Only manual (non-policy-managed) actions are in scope.
+      preconditions:
+        all:
+          - key: "{{ policyName }}"
+            operator: Equals
+            value: ""
+      validate:
+        message: >-
+          Manually created BackupAction/RunAction objects must set
+          spec.expiresAt (RFC3339) so their restore points expire. Policy-managed
+          actions (carrying the k10.kasten.io/policyName label) are exempt.
+        pattern:
+          spec:
+            expiresAt: "?*"

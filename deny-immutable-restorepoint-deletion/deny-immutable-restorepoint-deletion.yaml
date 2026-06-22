@@ -1,0 +1,92 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: deny-immutable-restorepoint-deletion
+  annotations:
+    policies.kyverno.io/title: Deny Deletion of Immutable Restore Points
+    policies.kyverno.io/category: Veeam Kasten
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: RestorePoint, RestorePointContent
+    kyverno.io/kyverno-version: 1.12.1
+    policies.kyverno.io/minversion: 1.12.0
+    kyverno.io/kubernetes-version: "1.24-1.30"
+    # SCOPE B: requires Kasten v9.0 admission control on RestorePoints (Preview).
+    veeamkasten.dev/scope: "B"
+    veeamkasten.dev/availability: preview-v9
+    veeamkasten.dev/status: unverified
+    policies.kyverno.io/description: >-
+      Deny deletion of a policy-managed Veeam Kasten RestorePoint or
+      RestorePointContent whose data was exported to an immutable location
+      profile, so retention/immutability guarantees cannot be circumvented by
+      deleting the Kubernetes object.
+      Immutability is NOT a field on the RestorePoint; it is a property of the
+      originating Location Profile
+      (spec.locationSpec.objectStore.protectionPeriod). This policy resolves it
+      with a Kyverno context apiCall to that Profile.
+      REQUIRES Kasten v9.0 admission control on RestorePoints (Preview).
+      STATUS: unverified - TWO assumptions must be confirmed on a live cluster:
+      (1) the path from the RestorePoint(Content) to its originating Profile
+      (`profileRefPath` below) is a GUESS and almost certainly differs per
+      version - confirm with `oc explain restorepointcontents.apps.kio.kasten.io
+      --recursive` and `oc get restorepointcontents -o yaml`; (2) whether the
+      `k10.kasten.io/policyName` label is present on RestorePoint /
+      RestorePointContent (docs scope it primarily to ClusterRestorePoint).
+      LIMITATION: if the Profile cannot be resolved at admission time, the
+      immutability signal is unavailable and the policy will NOT deny. Treat the
+      immutability resolution as [unverified] until validated against a cluster.
+spec:
+  validationFailureAction: Audit
+  background: false
+  rules:
+    - name: deny-immutable-delete
+      match:
+        any:
+          - resources:
+              kinds:
+                - apps.kio.kasten.io/v1alpha1/RestorePoint
+                - apps.kio.kasten.io/v1alpha1/RestorePointContent
+              operations:
+                - DELETE
+      context:
+        # Policy-managed marker. On DELETE the object lives in oldObject; fall
+        # back to object so the policy also works under CREATE/UPDATE testing.
+        - name: policyName
+          variable:
+            jmesPath: 'request.oldObject.metadata.labels."k10.kasten.io/policyName" || request.object.metadata.labels."k10.kasten.io/policyName"'
+            default: ""
+        # [unverified] originating Profile reference. ADJUST these paths once
+        # confirmed against a live RestorePointContent.
+        - name: profileName
+          variable:
+            jmesPath: 'request.oldObject.spec.location.profile.name || request.object.spec.location.profile.name'
+            default: ""
+        - name: profileNamespace
+          variable:
+            jmesPath: 'request.oldObject.spec.location.profile.namespace || request.object.spec.location.profile.namespace'
+            default: "kasten-io"
+        # Resolve immutability from the originating Location Profile. In offline
+        # CLI tests this value is injected via the variables file, which
+        # overrides the apiCall (no live cluster needed).
+        - name: protectionPeriod
+          apiCall:
+            urlPath: "/apis/config.kio.kasten.io/v1alpha1/namespaces/{{ profileNamespace }}/profiles/{{ profileName }}"
+            jmesPath: "spec.locationSpec.objectStore.protectionPeriod || ''"
+            default: ""
+      # Only policy-managed restore points are in scope.
+      preconditions:
+        all:
+          - key: "{{ policyName }}"
+            operator: NotEquals
+            value: ""
+      validate:
+        message: >-
+          Deletion denied: this RestorePoint/RestorePointContent is policy-managed
+          and was exported to an immutable location profile (protectionPeriod is
+          set). Immutable restore points must expire naturally and cannot be
+          deleted manually.
+        deny:
+          conditions:
+            all:
+              - key: "{{ protectionPeriod }}"
+                operator: NotEquals
+                value: ""

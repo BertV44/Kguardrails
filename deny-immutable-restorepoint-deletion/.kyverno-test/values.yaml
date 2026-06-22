@@ -1,0 +1,25 @@
+# Simulates a DELETE admission request and mocks the Profile lookup.
+# globalValues sets request.operation to DELETE so the DELETE-scoped rule fires.
+# Per-resource values inject protectionPeriod, overriding the policy's apiCall
+# (CLI 1.18.1 has no apiCallResponses, so the variable injection is used).
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata:
+  name: values
+globalValues:
+  request.operation: DELETE
+policies:
+  - name: deny-immutable-restorepoint-deletion
+    resources:
+      - name: rpc-immutable-managed
+        values:
+          protectionPeriod: "720h0m0s"
+      - name: rpc-mutable-managed
+        values:
+          protectionPeriod: ""
+      - name: rpc-manual
+        values:
+          protectionPeriod: "720h0m0s"
+      - name: rp-immutable-managed
+        values:
+          protectionPeriod: "720h0m0s"
