@@ -1,0 +1,33 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-expiry-on-manual-actions
+policies:
+  - ../require-expiry-on-manual-actions.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: require-expiry-on-manual-actions
+    rule: manual-action-must-expire
+    kind: BackupAction
+    resources:
+      - good-manual-backup-with-expiry
+    result: pass
+  - policy: require-expiry-on-manual-actions
+    rule: manual-action-must-expire
+    kind: BackupAction
+    resources:
+      - bad-manual-backup-no-expiry
+    result: fail
+  - policy: require-expiry-on-manual-actions
+    rule: manual-action-must-expire
+    kind: BackupAction
+    resources:
+      - managed-backup-no-expiry
+    result: skip
+  - policy: require-expiry-on-manual-actions
+    rule: manual-action-must-expire
+    kind: RunAction
+    resources:
+      - bad-manual-run-no-expiry
+    result: fail

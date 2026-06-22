@@ -1,0 +1,27 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-resource-exclusions
+policies:
+  - ../require-resource-exclusions.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: require-resource-exclusions
+    rule: backup-must-exclude-sensitive-resources
+    kind: Policy
+    resources:
+      - good-policy-excludes-secrets
+    result: pass
+  - policy: require-resource-exclusions
+    rule: backup-must-exclude-sensitive-resources
+    kind: Policy
+    resources:
+      - bad-policy-missing-secret-exclusion
+    result: fail
+  - policy: require-resource-exclusions
+    rule: backup-must-exclude-sensitive-resources
+    kind: Policy
+    resources:
+      - export-only-policy
+    result: skip

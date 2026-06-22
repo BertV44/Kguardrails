@@ -1,0 +1,50 @@
+# Test resources for exclude-sensitive-on-restore (validate + mutate).
+---
+# GOOD (validate pass): already excludes secrets. Mutate rules skip.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: good-restore-excludes-secrets
+  namespace: app-team-a
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-a
+  filters:
+    excludeResources:
+      - group: ""
+        version: v1
+        resource: secrets
+---
+# BAD (validate fail): excludes only configmaps. Mutate rule 1 appends secrets.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: bad-restore-missing-secrets
+  namespace: app-team-a
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-a
+  filters:
+    excludeResources:
+      - group: ""
+        version: v1
+        resource: configmaps
+---
+# BAD (validate fail): no filters at all. Mutate rule 2 creates the exclusion.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: no-filters-restore
+  namespace: app-team-a
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-a

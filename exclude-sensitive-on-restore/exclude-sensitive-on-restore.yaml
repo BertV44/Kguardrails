@@ -1,0 +1,59 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: exclude-sensitive-on-restore
+  annotations:
+    policies.kyverno.io/title: Exclude Sensitive Resources on Restore (Validate)
+    policies.kyverno.io/category: Veeam Kasten
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: RestoreAction
+    kyverno.io/kyverno-version: 1.12.1
+    policies.kyverno.io/minversion: 1.12.0
+    kyverno.io/kubernetes-version: "1.24-1.30"
+    # SCOPE B: requires Kasten v9.0 admission control on Actions (Preview).
+    veeamkasten.dev/scope: "B"
+    veeamkasten.dev/availability: preview-v9
+    veeamkasten.dev/status: unverified
+    policies.kyverno.io/description: >-
+      Require every Veeam Kasten RestoreAction to exclude a configurable set of
+      sensitive resource types (Secrets by default) via spec.filters, so that
+      restoring a workload does not silently overwrite or reintroduce sensitive
+      resources in the target namespace. A companion mutate policy
+      (exclude-sensitive-on-restore-mutate) can inject these exclusions
+      automatically.
+      REQUIRES Kasten v9.0 admission control on Actions (Preview).
+      STATUS: unverified - `spec.filters.excludeResources[].resource` on
+      RestoreAction has NOT been confirmed with
+      `oc explain restoreactions.actions.kio.kasten.io --recursive`.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: restore-must-exclude-sensitive-resources
+      match:
+        any:
+          - resources:
+              kinds:
+                - actions.kio.kasten.io/v1alpha1/RestoreAction
+              operations:
+                - CREATE
+                - UPDATE
+      context:
+        # CONFIGURABLE sensitive-resource list (see README for ConfigMap option).
+        - name: sensitiveResources
+          variable:
+            value:
+              - secrets
+      validate:
+        message: >-
+          RestoreAction must exclude all configured sensitive resource types via
+          spec.filters.excludeResources. Missing exclusions for one or more
+          sensitive resources.
+        foreach:
+          - list: "sensitiveResources"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ element }}"
+                    operator: AnyNotIn
+                    value: "{{ request.object.spec.filters.excludeResources[].resource || `[]` }}"

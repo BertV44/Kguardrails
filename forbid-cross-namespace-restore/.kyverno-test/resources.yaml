@@ -1,0 +1,54 @@
+# Test resources for forbid-cross-namespace-restore.
+---
+# GOOD: restore into the same namespace as the source.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: good-same-namespace-restore
+  namespace: app-team-a
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-a
+---
+# GOOD: restore-in-place (no targetNamespace declared).
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: good-restore-in-place
+  namespace: app-team-a
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+---
+# GOOD: cross-namespace restore explicitly allowed via annotation.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: good-cross-namespace-allowed
+  namespace: app-team-b
+  annotations:
+    veeamkasten.dev/allow-cross-namespace-restore: "true"
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-b
+---
+# BAD: cross-namespace restore without the allow-list annotation.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: bad-cross-namespace-restore
+  namespace: app-team-b
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-b

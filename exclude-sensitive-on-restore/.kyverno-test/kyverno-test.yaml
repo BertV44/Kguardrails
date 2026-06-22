@@ -1,0 +1,30 @@
+# Validate policy tested in isolation. The mutate companion is tested separately
+# under .kyverno-test-mutate/ because, at admission, mutation runs before
+# validation and would otherwise repair the resource before this rule sees it.
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: exclude-sensitive-on-restore-validate
+policies:
+  - ../exclude-sensitive-on-restore.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: exclude-sensitive-on-restore
+    rule: restore-must-exclude-sensitive-resources
+    kind: RestoreAction
+    resources:
+      - good-restore-excludes-secrets
+    result: pass
+  - policy: exclude-sensitive-on-restore
+    rule: restore-must-exclude-sensitive-resources
+    kind: RestoreAction
+    resources:
+      - bad-restore-missing-secrets
+    result: fail
+  - policy: exclude-sensitive-on-restore
+    rule: restore-must-exclude-sensitive-resources
+    kind: RestoreAction
+    resources:
+      - no-filters-restore
+    result: fail

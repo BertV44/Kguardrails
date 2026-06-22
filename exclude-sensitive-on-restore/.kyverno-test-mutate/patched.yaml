@@ -1,0 +1,40 @@
+# Expected mutated output for the mutate companion policy.
+---
+# bad-restore-missing-secrets: secrets appended after configmaps (rule 1).
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: bad-restore-missing-secrets
+  namespace: app-team-a
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-a
+  filters:
+    excludeResources:
+      - group: ""
+        version: v1
+        resource: configmaps
+      - group: ""
+        version: v1
+        resource: secrets
+---
+# no-filters-restore: exclusion list created with secrets (rule 2).
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RestoreAction
+metadata:
+  name: no-filters-restore
+  namespace: app-team-a
+spec:
+  subject:
+    kind: RestorePoint
+    name: app-team-a-rp-1
+    namespace: app-team-a
+  targetNamespace: app-team-a
+  filters:
+    excludeResources:
+      - group: ""
+        version: v1
+        resource: secrets

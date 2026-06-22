@@ -1,0 +1,74 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: forbid-cross-namespace-restore
+  annotations:
+    policies.kyverno.io/title: Forbid Cross-Namespace Restore
+    policies.kyverno.io/category: Veeam Kasten
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: RestoreAction
+    kyverno.io/kyverno-version: 1.12.1
+    policies.kyverno.io/minversion: 1.12.0
+    kyverno.io/kubernetes-version: "1.24-1.30"
+    # SCOPE B: requires Kasten v9.0 admission control on Actions (Preview).
+    veeamkasten.dev/scope: "B"
+    veeamkasten.dev/availability: preview-v9
+    veeamkasten.dev/status: unverified
+    policies.kyverno.io/description: >-
+      Deny a Veeam Kasten RestoreAction that restores into a namespace different
+      from the source application namespace, unless an explicit allow-list
+      annotation is present. This prevents accidental or unauthorized
+      cross-namespace data movement during restores.
+      The allow-list annotation key is configurable; by default a RestoreAction
+      annotated `veeamkasten.dev/allow-cross-namespace-restore: "true"` is
+      permitted. Restore-in-place (empty spec.targetNamespace) is always allowed.
+      REQUIRES Kasten v9.0 admission control on Actions (Preview).
+      STATUS: unverified - `spec.targetNamespace` and `spec.subject.namespace`
+      (source application namespace) have NOT been confirmed with
+      `oc explain restoreactions.actions.kio.kasten.io --recursive`.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: target-must-match-source
+      match:
+        any:
+          - resources:
+              kinds:
+                - actions.kio.kasten.io/v1alpha1/RestoreAction
+              operations:
+                - CREATE
+                - UPDATE
+      context:
+        - name: targetNs
+          variable:
+            jmesPath: "request.object.spec.targetNamespace"
+            default: ""
+        - name: sourceNs
+          variable:
+            jmesPath: "request.object.spec.subject.namespace"
+            default: ""
+        # CONFIGURABLE allow-list: change this annotation key to match your
+        # convention, or replace with a label / RBAC-gated check.
+        - name: allowCrossNamespace
+          variable:
+            jmesPath: 'request.object.metadata.annotations."veeamkasten.dev/allow-cross-namespace-restore"'
+            default: "false"
+      validate:
+        message: >-
+          RestoreAction targetNamespace differs from the source application
+          namespace. Cross-namespace restore is denied unless the RestoreAction
+          is annotated veeamkasten.dev/allow-cross-namespace-restore="true".
+        deny:
+          conditions:
+            all:
+              # Restore-in-place (empty targetNamespace) is allowed.
+              - key: "{{ targetNs }}"
+                operator: NotEquals
+                value: ""
+              - key: "{{ targetNs }}"
+                operator: NotEquals
+                value: "{{ sourceNs }}"
+              - key: "{{ allowCrossNamespace }}"
+                operator: NotEquals
+                value: "true"

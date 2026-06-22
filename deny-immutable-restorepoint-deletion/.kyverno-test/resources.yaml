@@ -1,0 +1,58 @@
+# Test resources for deny-immutable-restorepoint-deletion.
+# DELETE operation is simulated via values.yaml (globalValues request.operation).
+# The Profile lookup (protectionPeriod) is mocked per-resource in values.yaml,
+# overriding the policy's apiCall so no live cluster is required.
+---
+# DENY: policy-managed RestorePointContent exported to immutable storage.
+apiVersion: apps.kio.kasten.io/v1alpha1
+kind: RestorePointContent
+metadata:
+  name: rpc-immutable-managed
+  labels:
+    k10.kasten.io/policyName: gold
+    k10.kasten.io/policyNamespace: kasten-io
+spec:
+  location:
+    profile:
+      name: immutable-s3
+      namespace: kasten-io
+---
+# ALLOW (pass): policy-managed but exported to a mutable profile (no
+# protectionPeriod) - deletion is permitted.
+apiVersion: apps.kio.kasten.io/v1alpha1
+kind: RestorePointContent
+metadata:
+  name: rpc-mutable-managed
+  labels:
+    k10.kasten.io/policyName: gold
+    k10.kasten.io/policyNamespace: kasten-io
+spec:
+  location:
+    profile:
+      name: mutable-s3
+      namespace: kasten-io
+---
+# SKIP: not policy-managed (no policyName label) - out of scope.
+apiVersion: apps.kio.kasten.io/v1alpha1
+kind: RestorePointContent
+metadata:
+  name: rpc-manual
+spec:
+  location:
+    profile:
+      name: immutable-s3
+      namespace: kasten-io
+---
+# DENY: policy-managed RestorePoint (not just content) on immutable storage.
+apiVersion: apps.kio.kasten.io/v1alpha1
+kind: RestorePoint
+metadata:
+  name: rp-immutable-managed
+  labels:
+    k10.kasten.io/policyName: gold
+    k10.kasten.io/policyNamespace: kasten-io
+spec:
+  location:
+    profile:
+      name: immutable-s3
+      namespace: kasten-io

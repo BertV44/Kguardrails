@@ -1,0 +1,50 @@
+# Test resources for require-expiry-on-manual-actions.
+---
+# GOOD: manual BackupAction with expiresAt set.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: BackupAction
+metadata:
+  name: good-manual-backup-with-expiry
+  namespace: app-team-a
+spec:
+  subject:
+    name: app-team-a
+    namespace: app-team-a
+  expiresAt: "2026-12-31T23:59:59Z"
+---
+# BAD: manual BackupAction without expiresAt.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: BackupAction
+metadata:
+  name: bad-manual-backup-no-expiry
+  namespace: app-team-a
+spec:
+  subject:
+    name: app-team-a
+    namespace: app-team-a
+---
+# SKIP: policy-managed BackupAction (has policyName label), no expiry required.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: BackupAction
+metadata:
+  name: managed-backup-no-expiry
+  namespace: app-team-a
+  labels:
+    k10.kasten.io/policyName: gold
+    k10.kasten.io/policyNamespace: kasten-io
+spec:
+  subject:
+    name: app-team-a
+    namespace: app-team-a
+---
+# BAD: manual RunAction without expiresAt.
+apiVersion: actions.kio.kasten.io/v1alpha1
+kind: RunAction
+metadata:
+  name: bad-manual-run-no-expiry
+  namespace: kasten-io
+spec:
+  subject:
+    kind: Policy
+    name: gold
+    namespace: kasten-io

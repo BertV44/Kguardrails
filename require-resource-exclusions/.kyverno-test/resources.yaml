@@ -1,0 +1,70 @@
+# Test resources for require-resource-exclusions.
+---
+# GOOD: backup action excludes secrets.
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: good-policy-excludes-secrets
+  namespace: kasten-io
+spec:
+  presetRef:
+    name: gold
+    namespace: kasten-io
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values:
+          - app-team-a
+  actions:
+    - action: backup
+      backupParameters:
+        filters:
+          excludeResources:
+            - group: ""
+              version: v1
+              resource: secrets
+---
+# BAD: backup action present but excludes only configmaps, not secrets.
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: bad-policy-missing-secret-exclusion
+  namespace: kasten-io
+spec:
+  presetRef:
+    name: gold
+    namespace: kasten-io
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values:
+          - app-team-a
+  actions:
+    - action: backup
+      backupParameters:
+        filters:
+          excludeResources:
+            - group: ""
+              version: v1
+              resource: configmaps
+---
+# SKIP: export-only policy (no backup action) is out of scope.
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: export-only-policy
+  namespace: kasten-io
+spec:
+  presetRef:
+    name: gold
+    namespace: kasten-io
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values:
+          - app-team-a
+  actions:
+    - action: export

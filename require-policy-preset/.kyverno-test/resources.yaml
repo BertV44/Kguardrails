@@ -1,0 +1,41 @@
+# Test resources for require-policy-preset.
+# Generic, anonymized namespaces/labels only.
+---
+# GOOD: references a preset, no inline schedule/retention.
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: good-policy-with-preset
+  namespace: kasten-io
+spec:
+  presetRef:
+    name: gold
+    namespace: kasten-io
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values:
+          - app-team-a
+  actions:
+    - action: backup
+---
+# BAD: no presetRef, and carries inline frequency + retention.
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: bad-policy-inline-schedule
+  namespace: kasten-io
+spec:
+  frequency: "@daily"
+  retention:
+    daily: 7
+    weekly: 4
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values:
+          - app-team-a
+  actions:
+    - action: backup

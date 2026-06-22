@@ -1,0 +1,74 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-policy-preset
+  annotations:
+    policies.kyverno.io/title: Require Policy Preset
+    policies.kyverno.io/category: Veeam Kasten
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Policy
+    kyverno.io/kyverno-version: 1.12.1
+    policies.kyverno.io/minversion: 1.12.0
+    kyverno.io/kubernetes-version: "1.24-1.30"
+    # Custom scope/availability markers (see RESEARCH.md and README legend).
+    veeamkasten.dev/scope: "A"
+    veeamkasten.dev/availability: available-v8
+    veeamkasten.dev/status: unverified
+    policies.kyverno.io/description: >-
+      Standardize Veeam Kasten data protection by requiring every Kasten Policy
+      (config.kio.kasten.io/v1alpha1) to reference a PolicyPreset via
+      spec.presetRef, and by forbidding inline schedule/retention on the Policy
+      itself. Centralizing schedule and retention in presets makes them
+      auditable and consistently enforced across teams.
+      STATUS: unverified - field paths are taken from documentation and upstream
+      examples and have NOT yet been confirmed against a live cluster with
+      `oc explain policies.config.kio.kasten.io --recursive`.
+spec:
+  # Safe default for public reuse. Switch to Enforce to block non-compliant
+  # Policy objects at admission time (see README "Enforce" section).
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: require-preset-ref
+      match:
+        any:
+          - resources:
+              kinds:
+                - config.kio.kasten.io/v1alpha1/Policy
+              operations:
+                - CREATE
+                - UPDATE
+      validate:
+        message: >-
+          Every Kasten Policy must reference a PolicyPreset via
+          spec.presetRef.name so that schedule and retention are standardized.
+        pattern:
+          spec:
+            presetRef:
+              name: "?*"
+    - name: forbid-inline-schedule-retention
+      match:
+        any:
+          - resources:
+              kinds:
+                - config.kio.kasten.io/v1alpha1/Policy
+              operations:
+                - CREATE
+                - UPDATE
+      validate:
+        message: >-
+          Inline spec.frequency, spec.subFrequency and spec.retention are not
+          allowed when standardizing on presets. Move schedule and retention
+          into the referenced PolicyPreset.
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.frequency || '' }}"
+                operator: NotEquals
+                value: ""
+              - key: "{{ length(keys(request.object.spec.retention || `{}`)) }}"
+                operator: GreaterThan
+                value: 0
+              - key: "{{ length(keys(request.object.spec.subFrequency || `{}`)) }}"
+                operator: GreaterThan
+                value: 0
