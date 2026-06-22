@@ -12,7 +12,7 @@ metadata:
     kyverno.io/kubernetes-version: "1.24-1.30"
     veeamkasten.dev/scope: "A"
     veeamkasten.dev/availability: available-v8
-    veeamkasten.dev/status: unverified
+    veeamkasten.dev/status: verified
     policies.kyverno.io/description: >-
       Require every Veeam Kasten Policy that contains a backup action to declare
       resource exclusion filters covering a configurable sensitive-resource
@@ -20,11 +20,11 @@ metadata:
       being captured in backups unless explicitly intended.
       The sensitive list is configurable via the `sensitiveResources` context
       variable below (or by replacing it with a ConfigMap apiCall - see README).
-      STATUS: unverified - the filter path
-      `spec.actions[].backupParameters.filters.excludeResources[].resource` is
-      taken from documentation/upstream and has NOT been confirmed with
-      `oc explain policies.config.kio.kasten.io --recursive`. The exact filter
-      shape (resource/group/version keys) varies by Kasten version.
+      STATUS: verified - the filter path
+      `spec.actions[].backupParameters.filters.excludeResources[].resource`
+      (entries carry group/version/resource/name/matchLabels/matchExpressions)
+      confirmed via `oc explain policies.config.kio.kasten.io --recursive`
+      (cluster CRDs 2025-12).
 spec:
   validationFailureAction: Audit
   background: true

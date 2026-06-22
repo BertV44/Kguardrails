@@ -22,9 +22,13 @@ metadata:
       (exclude-sensitive-on-restore-mutate) can inject these exclusions
       automatically.
       REQUIRES Kasten v9.0 admission control on Actions (Preview).
-      STATUS: unverified - `spec.filters.excludeResources[].resource` on
-      RestoreAction has NOT been confirmed with
-      `oc explain restoreactions.actions.kio.kasten.io --recursive`.
+      STATUS: unverified - `oc explain restoreactions.actions.kio.kasten.io`
+      shows `spec.filters` as an OPAQUE map[string] (no published sub-schema),
+      so `spec.filters.excludeResources[].resource` could NOT be confirmed from
+      the CRD. The structured filter shape is published under the Policy CRD
+      (spec.actions[].restoreParameters.filters.excludeResources[]), and is
+      assumed identical here. Confirm against a real RestoreAction
+      (`oc get restoreactions -A -o yaml`) before enforcing.
 spec:
   validationFailureAction: Audit
   background: true

@@ -3,6 +3,44 @@
 Phase 1 findings. This document is the ground-truth reference that Phase 2
 (policy implementation) builds on.
 
+## CLUSTER RECONCILIATION (oc explain, cluster CRDs dated 2025-12-03)
+
+A live `oc explain --recursive` dump of the Kasten lab CRDs reconciled the
+doc-only assumptions below. Net result:
+
+| Policy | Verdict | Detail |
+| --- | --- | --- |
+| 1 require-policy-preset | **verified** | `spec.presetRef.{name,namespace}`, `spec.frequency`, `spec.subFrequency`, `spec.retention.{hourly,daily,weekly,monthly,yearly,table}`, `spec.actions[].action` all exist as coded. |
+| 2 require-resource-exclusions | **verified** | `spec.actions[].backupParameters.filters.excludeResources[]` confirmed; entries carry `group/version/resource/name/matchLabels/matchExpressions`. Filters are per-action (`backupParameters`, `restoreParameters`, `restoreClusterParameters`, `batchRestoreParameters`, `stageParameters`, `validateParameters`, `backupClusterParameters`). |
+| 6 forbid-cross-namespace-restore | **verified** | `RestoreAction.spec.targetNamespace` and `spec.subject.{apiVersion,kind,name,namespace}` confirmed. |
+| 3 require-expiry-on-manual-actions | **partial** | `BackupAction.spec.expiresAt` and `RunAction.spec.expiresAt` confirmed. Manual-vs-managed label NOT verifiable via explain — needs `--show-labels`. |
+| 4 exclude-sensitive-on-restore | **blocked** | `RestoreAction.spec.filters` is an OPAQUE `map[string]` in the CRD (no sub-schema). `BackupAction.spec.filters` likewise. Structured shape only published under the Policy CRD's `*Parameters.filters`. Needs a real RestoreAction. |
+| 5 deny-immutable-restorepoint-deletion | **corrected** | See below. Several original assumptions were wrong. |
+
+**Corrections applied to policy 5:**
+- Profile immutability field is **`spec.export.location.objectStore.protectionPeriod`** (NOT `spec.locationSpec.objectStore.protectionPeriod`).
+- `RestorePointContent` has **no `spec`** (status only). The old `spec.location.profile.*` path was invalid.
+- Originating policy is recorded at `status.restorePointContentDetails.originatingPolicies[]` (RestorePointContent) and `status.restorePointDetails.originatingPolicies[]` (RestorePoint) — used as the policy-managed marker.
+- Originating Profile ref lives (nested, per-artifact) at
+  `status.<details>.artifacts[].meta.{kanister,dataservice,...}.profileRef.{name,namespace}` — exact sub-key still needs a real object.
+- `RestorePoint.spec.restorePointContentRef.name` confirmed.
+
+**Environment facts:**
+- `oc get validatingwebhookconfigurations | grep -i kasten` returned **nothing** — no Kasten-native admission webhook on this cluster, so the v9.0 admission feature (Tech Preview) is not deployed here. Scope B policies still enforce via Kyverno's own webhook, but live end-to-end testing of the Kasten v9.0 path is not possible on this cluster.
+- CRDs present: `policies`, `policypresets`, `profiles` (`config.kio.kasten.io`); `backupactions`, `restoreactions`, `runactions` (`actions.kio.kasten.io`); `restorepoints`, `restorepointcontents` (`apps.kio.kasten.io`). Kasten version string not captured (re-run with `oc -n kasten-io get k10s -o yaml | grep -i version`).
+
+**Still to run on the cluster** (to close policies 3, 4, 5):
+```
+oc get backupactions.actions.kio.kasten.io -A --show-labels
+oc get restorepoints.apps.kio.kasten.io -A --show-labels
+oc get restorepointcontents.apps.kio.kasten.io -A -o yaml | sed -n '1,160p'
+oc get restoreactions.actions.kio.kasten.io -A -o yaml | sed -n '1,120p'
+oc -n kasten-io get k10s.apik10.kasten.io -o yaml | grep -i version
+```
+
+---
+
+
 ## 0. Status of this document
 
 - **Method**: doc-only. At the time of writing, no live Kasten cluster was

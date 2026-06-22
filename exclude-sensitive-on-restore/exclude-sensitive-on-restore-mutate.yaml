@@ -23,9 +23,10 @@ metadata:
       To exclude additional resource types automatically, extend the injected
       value(s) below; the validate companion enforces the full configured list.
       REQUIRES Kasten v9.0 admission control on Actions (Preview).
-      STATUS: unverified - `spec.filters.excludeResources` on RestoreAction has
-      NOT been confirmed with
-      `oc explain restoreactions.actions.kio.kasten.io --recursive`.
+      STATUS: unverified - `oc explain restoreactions.actions.kio.kasten.io`
+      shows `spec.filters` as an OPAQUE map[string]; the excludeResources shape
+      is assumed from the Policy CRD's restoreParameters.filters and must be
+      confirmed against a real RestoreAction before enforcing.
 spec:
   # Mutate policies act at admission; rules run in order.
   background: false

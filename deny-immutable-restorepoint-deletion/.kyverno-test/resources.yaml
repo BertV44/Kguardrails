@@ -2,20 +2,26 @@
 # DELETE operation is simulated via values.yaml (globalValues request.operation).
 # The Profile lookup (protectionPeriod) is mocked per-resource in values.yaml,
 # overriding the policy's apiCall so no live cluster is required.
+# NOTE: RestorePointContent has no spec; the policy-managed marker and the
+# originating Profile ref both live under status (confirmed via oc explain,
+# cluster CRDs 2025-12).
 ---
 # DENY: policy-managed RestorePointContent exported to immutable storage.
 apiVersion: apps.kio.kasten.io/v1alpha1
 kind: RestorePointContent
 metadata:
   name: rpc-immutable-managed
-  labels:
-    k10.kasten.io/policyName: gold
-    k10.kasten.io/policyNamespace: kasten-io
-spec:
-  location:
-    profile:
-      name: immutable-s3
-      namespace: kasten-io
+status:
+  restorePointContentDetails:
+    originatingPolicies:
+      - name: gold
+        namespace: kasten-io
+    artifacts:
+      - meta:
+          kanister:
+            profileRef:
+              name: immutable-s3
+              namespace: kasten-io
 ---
 # ALLOW (pass): policy-managed but exported to a mutable profile (no
 # protectionPeriod) - deletion is permitted.
@@ -23,36 +29,48 @@ apiVersion: apps.kio.kasten.io/v1alpha1
 kind: RestorePointContent
 metadata:
   name: rpc-mutable-managed
-  labels:
-    k10.kasten.io/policyName: gold
-    k10.kasten.io/policyNamespace: kasten-io
-spec:
-  location:
-    profile:
-      name: mutable-s3
-      namespace: kasten-io
+status:
+  restorePointContentDetails:
+    originatingPolicies:
+      - name: gold
+        namespace: kasten-io
+    artifacts:
+      - meta:
+          kanister:
+            profileRef:
+              name: mutable-s3
+              namespace: kasten-io
 ---
-# SKIP: not policy-managed (no policyName label) - out of scope.
+# SKIP: not policy-managed (no originatingPolicies) - out of scope.
 apiVersion: apps.kio.kasten.io/v1alpha1
 kind: RestorePointContent
 metadata:
   name: rpc-manual
-spec:
-  location:
-    profile:
-      name: immutable-s3
-      namespace: kasten-io
+status:
+  restorePointContentDetails:
+    artifacts:
+      - meta:
+          kanister:
+            profileRef:
+              name: immutable-s3
+              namespace: kasten-io
 ---
 # DENY: policy-managed RestorePoint (not just content) on immutable storage.
 apiVersion: apps.kio.kasten.io/v1alpha1
 kind: RestorePoint
 metadata:
   name: rp-immutable-managed
-  labels:
-    k10.kasten.io/policyName: gold
-    k10.kasten.io/policyNamespace: kasten-io
 spec:
-  location:
-    profile:
-      name: immutable-s3
-      namespace: kasten-io
+  restorePointContentRef:
+    name: rpc-immutable-managed
+status:
+  restorePointDetails:
+    originatingPolicies:
+      - name: gold
+        namespace: kasten-io
+    artifacts:
+      - meta:
+          kanister:
+            profileRef:
+              name: immutable-s3
+              namespace: kasten-io

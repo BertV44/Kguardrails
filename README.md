@@ -10,12 +10,14 @@ All content is anonymized and generic: example namespaces (`app-team-a`,
 identifiers. Sensitive-resource lists and allow-list labels are configurable.
 
 > **Project status: work in progress.**
-> Every policy is currently tagged `veeamkasten.dev/status: unverified`. CRD
-> field paths and JMESPath anchors were derived from documentation and upstream
-> examples and have **not** yet been confirmed against a live cluster with
-> `oc explain`. See [docs/RESEARCH.md](docs/RESEARCH.md) for the exact open
-> questions and the `oc explain` commands that must be run to lift the
-> `unverified` tag. Until then, run these policies in `Audit` only.
+> CRD field paths have now been partially reconciled against a live cluster
+> (`oc explain`, Kasten CRDs dated 2025-12). Per-policy state is in the matrix
+> below (`verified` / `partially-verified` / `unverified`). The cluster has **no
+> Kasten-native admission webhook**, so the v9.0 admission Tech Preview path
+> (Scope B) could not be exercised end-to-end; Scope B policies still enforce via
+> Kyverno's own webhook. See [docs/RESEARCH.md](docs/RESEARCH.md) for the
+> reconciliation details and the remaining `oc` commands needed to close
+> policies 3, 4 and 5. Keep all policies in `Audit` until fully verified.
 
 ## Status legend
 
@@ -27,14 +29,14 @@ identifiers. Sensitive-resource lists and allow-list labels are configurable.
 
 ## Policy matrix
 
-| # | Policy | Scope | Availability | Type | Default action | Subject |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | [require-policy-preset](require-policy-preset/) | A | `[available]` `[unverified]` | validate | Audit | `Policy` |
-| 2 | [require-resource-exclusions](require-resource-exclusions/) | A | `[available]` `[unverified]` | validate | Audit | `Policy` |
-| 3 | [require-expiry-on-manual-actions](require-expiry-on-manual-actions/) | B | `[preview]` `[unverified]` | validate | Audit | `BackupAction`, `RunAction` |
-| 4 | [exclude-sensitive-on-restore](exclude-sensitive-on-restore/) | B | `[preview]` `[unverified]` | validate + mutate | Audit | `RestoreAction` |
-| 5 | [deny-immutable-restorepoint-deletion](deny-immutable-restorepoint-deletion/) | B | `[preview]` `[unverified]` | validate (deny on DELETE) | Audit | `RestorePoint`, `RestorePointContent` |
-| 6 | [forbid-cross-namespace-restore](forbid-cross-namespace-restore/) | B | `[preview]` `[unverified]` | validate | Audit | `RestoreAction` |
+| # | Policy | Scope | Availability | Verification | Type | Default action | Subject |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | [require-policy-preset](require-policy-preset/) | A | `[available]` | verified | validate | Audit | `Policy` |
+| 2 | [require-resource-exclusions](require-resource-exclusions/) | A | `[available]` | verified | validate | Audit | `Policy` |
+| 3 | [require-expiry-on-manual-actions](require-expiry-on-manual-actions/) | B | `[preview]` | partially-verified (label TBD) | validate | Audit | `BackupAction`, `RunAction` |
+| 4 | [exclude-sensitive-on-restore](exclude-sensitive-on-restore/) | B | `[preview]` | unverified (filters is opaque map) | validate + mutate | Audit | `RestoreAction` |
+| 5 | [deny-immutable-restorepoint-deletion](deny-immutable-restorepoint-deletion/) | B | `[preview]` | corrected; profileRef path TBD | validate (deny on DELETE) | Audit | `RestorePoint`, `RestorePointContent` |
+| 6 | [forbid-cross-namespace-restore](forbid-cross-namespace-restore/) | B | `[preview]` | verified | validate | Audit | `RestoreAction` |
 
 **Scope A** — admission on standard Kubernetes objects and the Kasten `Policy`
 CRD (`config.kio.kasten.io/v1alpha1`). Available on Kasten v8.x.
