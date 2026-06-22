@@ -13,7 +13,7 @@ metadata:
     # SCOPE B: requires Kasten v9.0 admission control on Actions (Preview).
     veeamkasten.dev/scope: "B"
     veeamkasten.dev/availability: preview-v9
-    veeamkasten.dev/status: unverified
+    veeamkasten.dev/status: verified
     policies.kyverno.io/description: >-
       Deny a Veeam Kasten RestoreAction that restores into a namespace different
       from the source application namespace, unless an explicit allow-list
@@ -23,9 +23,10 @@ metadata:
       annotated `veeamkasten.dev/allow-cross-namespace-restore: "true"` is
       permitted. Restore-in-place (empty spec.targetNamespace) is always allowed.
       REQUIRES Kasten v9.0 admission control on Actions (Preview).
-      STATUS: unverified - `spec.targetNamespace` and `spec.subject.namespace`
-      (source application namespace) have NOT been confirmed with
-      `oc explain restoreactions.actions.kio.kasten.io --recursive`.
+      STATUS: verified - `spec.targetNamespace` and `spec.subject.namespace`
+      (source application namespace) confirmed via
+      `oc explain restoreactions.actions.kio.kasten.io --recursive`
+      (cluster CRDs 2025-12).
 spec:
   validationFailureAction: Audit
   background: true
