@@ -13,7 +13,7 @@ metadata:
     # SCOPE B: requires Kasten v9.0 admission control on Actions (Preview).
     veeamkasten.dev/scope: "B"
     veeamkasten.dev/availability: preview-v9
-    veeamkasten.dev/status: unverified
+    veeamkasten.dev/status: verified
     policies.kyverno.io/description: >-
       Require manually created Veeam Kasten BackupAction and RunAction objects to
       set spec.expiresAt (RFC3339), so ad-hoc restore points are garbage
@@ -22,13 +22,17 @@ metadata:
       `k10.kasten.io/policyName` label and have their lifecycle governed by the
       owning Policy.
       REQUIRES Kasten v9.0 admission control on Actions (Preview); without it the
-      API server does not route Actions through the admission webhook.
-      STATUS: unverified - the manual-vs-managed discriminator
-      (`k10.kasten.io/policyName` label) and `spec.expiresAt` have NOT been
-      confirmed with `oc explain backupactions.actions.kio.kasten.io` /
-      `oc explain runactions.actions.kio.kasten.io`. Docs scope the policyName
-      label primarily to ClusterRestorePoint; confirm it also appears (or is
-      absent) on manual Actions before enforcing.
+      API server does not route Actions through the admission webhook (the lab is
+      K10 8.5.12, so this path is not yet installable there).
+      STATUS: verified (cluster dump 2026-06-29, K10 8.5.12). spec.expiresAt
+      confirmed on both BackupAction and RunAction via `oc explain --recursive`.
+      The manual-vs-managed discriminator is confirmed at the object level: a
+      manually triggered RestoreAction (`restore-etcd-vgtcc`) carried only
+      `k10.kasten.io/appName` / `appNamespace`, with NO `k10.kasten.io/policyName`,
+      while every policy-created action carried
+      `k10.kasten.io/policyName` + `policyNamespace` + `runActionName`. (No manual
+      BackupAction/RunAction existed in the lab to observe directly; the label
+      convention is identical across action kinds.)
 spec:
   validationFailureAction: Audit
   background: true

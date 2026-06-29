@@ -2,6 +2,10 @@
 # DELETE operation is simulated via values.yaml (globalValues request.operation).
 # The Profile lookup (protectionPeriod) is mocked per-resource in values.yaml,
 # overriding the policy's apiCall so no live cluster is required.
+# Shapes mirror real K10 8.5.12 objects (cluster dump 2026-06-29): the
+# policy-managed marker is the k10.kasten.io/policyName LABEL, and status carries
+# only {actionTime, restorePointRef, scheduledTime, state} - no originatingPolicies
+# and no artifacts[].meta.*.profileRef (those were absent on the live objects).
 ---
 # DENY: policy-managed RestorePointContent exported to immutable storage.
 apiVersion: apps.kio.kasten.io/v1alpha1
@@ -11,11 +15,12 @@ metadata:
   labels:
     k10.kasten.io/policyName: gold
     k10.kasten.io/policyNamespace: kasten-io
-spec:
-  location:
-    profile:
-      name: immutable-s3
-      namespace: kasten-io
+status:
+  actionTime: "2026-06-17T14:11:54Z"
+  restorePointRef:
+    name: scheduled-tj7qt
+    namespace: etcd-backup
+  state: Bound
 ---
 # ALLOW (pass): policy-managed but exported to a mutable profile (no
 # protectionPeriod) - deletion is permitted.
@@ -26,22 +31,24 @@ metadata:
   labels:
     k10.kasten.io/policyName: gold
     k10.kasten.io/policyNamespace: kasten-io
-spec:
-  location:
-    profile:
-      name: mutable-s3
-      namespace: kasten-io
+status:
+  actionTime: "2026-06-17T13:51:00Z"
+  restorePointRef:
+    name: scheduled-8n2t6
+    namespace: etcd-backup
+  state: Bound
 ---
-# SKIP: not policy-managed (no policyName label) - out of scope.
+# SKIP: not policy-managed (no k10.kasten.io/policyName label) - out of scope.
 apiVersion: apps.kio.kasten.io/v1alpha1
 kind: RestorePointContent
 metadata:
   name: rpc-manual
-spec:
-  location:
-    profile:
-      name: immutable-s3
-      namespace: kasten-io
+status:
+  actionTime: "2026-06-17T13:51:00Z"
+  restorePointRef:
+    name: manual-rp
+    namespace: etcd-backup
+  state: Bound
 ---
 # DENY: policy-managed RestorePoint (not just content) on immutable storage.
 apiVersion: apps.kio.kasten.io/v1alpha1
@@ -52,7 +59,10 @@ metadata:
     k10.kasten.io/policyName: gold
     k10.kasten.io/policyNamespace: kasten-io
 spec:
-  location:
-    profile:
-      name: immutable-s3
-      namespace: kasten-io
+  restorePointContentRef:
+    name: rpc-immutable-managed
+status:
+  actionTime: "2026-06-17T14:11:54Z"
+  logicalSizeBytes: 10737418240
+  physicalSizeBytes: 10737418240
+  scheduledTime: "2026-06-17T14:11:50Z"

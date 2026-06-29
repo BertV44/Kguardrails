@@ -13,16 +13,16 @@ metadata:
     # Custom scope/availability markers (see RESEARCH.md and README legend).
     veeamkasten.dev/scope: "A"
     veeamkasten.dev/availability: available-v8
-    veeamkasten.dev/status: unverified
+    veeamkasten.dev/status: verified
     policies.kyverno.io/description: >-
       Standardize Veeam Kasten data protection by requiring every Kasten Policy
       (config.kio.kasten.io/v1alpha1) to reference a PolicyPreset via
       spec.presetRef, and by forbidding inline schedule/retention on the Policy
       itself. Centralizing schedule and retention in presets makes them
       auditable and consistently enforced across teams.
-      STATUS: unverified - field paths are taken from documentation and upstream
-      examples and have NOT yet been confirmed against a live cluster with
-      `oc explain policies.config.kio.kasten.io --recursive`.
+      STATUS: verified - spec.presetRef, spec.frequency, spec.subFrequency and
+      spec.retention confirmed via `oc explain policies.config.kio.kasten.io
+      --recursive` (cluster CRDs 2025-12).
 spec:
   # Safe default for public reuse. Switch to Enforce to block non-compliant
   # Policy objects at admission time (see README "Enforce" section).
