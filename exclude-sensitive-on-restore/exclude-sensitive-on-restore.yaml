@@ -27,8 +27,16 @@ metadata:
       so `spec.filters.excludeResources[].resource` could NOT be confirmed from
       the CRD. The structured filter shape is published under the Policy CRD
       (spec.actions[].restoreParameters.filters.excludeResources[]), and is
-      assumed identical here. Confirm against a real RestoreAction
-      (`oc get restoreactions -A -o yaml`) before enforcing.
+      assumed identical here.
+      OBJECT-LEVEL EVIDENCE (cluster dump 2026-06-29, K10 8.5.12): a real
+      RestoreAction (`restore-etcd-vgtcc`) omitted `spec.filters` entirely
+      (only `spec.profile`, `spec.subject`, `spec.targetNamespace` were set), and
+      a real BackupAction carried `spec.filters: {}` (empty map). This confirms
+      `filters` is optional and opaque, but no object in the lab populated
+      `excludeResources`, so the exact sub-key shape still cannot be confirmed
+      from a live object. The `|| `[]`` fallback below correctly handles the
+      absent-filters case. Confirm the populated shape against a RestoreAction
+      that actually sets exclusions before switching to Enforce.
 spec:
   validationFailureAction: Audit
   background: true

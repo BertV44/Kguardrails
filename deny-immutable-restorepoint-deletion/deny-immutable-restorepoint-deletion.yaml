@@ -20,21 +20,26 @@ metadata:
       profile, so retention/immutability guarantees cannot be circumvented by
       deleting the Kubernetes object.
       Immutability is NOT a field on the RestorePoint; it is a property of the
-      originating Location Profile
-      (spec.export.location.objectStore.protectionPeriod). This policy resolves
-      it with a Kyverno context apiCall to that Profile.
-      VERIFIED (cluster CRDs 2025-12): RestorePointContent has NO spec (status
-      only); the originating policy is recorded under
-      status.*.originatingPolicies[]; the Profile immutability field is
-      spec.export.location.objectStore.protectionPeriod.
-      STILL UNVERIFIED: the exact per-artifact path to the originating Profile
-      ref (status.*.artifacts[].meta.{kanister,dataservice}.profileRef) needs a
-      real RestorePointContent to confirm; and whether DELETE admission actually
-      fires for these objects depends on Kasten v9.0 admission (Preview) - this
-      cluster has no Kasten admission webhook, so enforcement here relies on
-      Kyverno's own webhook.
-      LIMITATION: if the Profile cannot be resolved at admission time, the
-      immutability signal is unavailable and the policy will NOT deny.
+      originating Location Profile (spec.locationSpec.objectStore.protectionPeriod).
+      This policy resolves it with a Kyverno context apiCall to that Profile.
+      VERIFIED (cluster dump 2026-06-29, K10 8.5.12): RestorePointContent has NO
+      spec (status only); RestorePoint and RestorePointContent both carry the
+      `k10.kasten.io/policyName` / `policyNamespace` labels when policy-managed
+      (used here as the managed marker); the real Location Profile uses
+      `spec.locationSpec.objectStore` (objectStoreType S3) - so protectionPeriod
+      lives at spec.locationSpec.objectStore.protectionPeriod.
+      LIMITATION (K10 8.5.12): the originating Profile reference is NOT exposed on
+      the RestorePoint/RestorePointContent object - their status carried only
+      {actionTime, restorePointRef, scheduledTime, state} with no
+      `originatingPolicies` and no `artifacts[].meta.*.profileRef`. The profile is
+      only referenced on the originating Action (spec.profile), not on the
+      restore-point object. So on this version the apiCall below cannot resolve a
+      profile from the object alone (profileName stays "") and the policy will NOT
+      deny - it degrades safely to allow. The artifacts/originatingPolicies paths
+      are retained as forward-compatible best-effort for versions that populate
+      them. To enforce on 8.5.12, resolve the profile via the originating Policy
+      (label -> Policy.spec.actions[].exportParameters.profile -> Profile), which
+      requires confirming the Policy export schema first.
 spec:
   validationFailureAction: Audit
   background: false
@@ -49,28 +54,18 @@ spec:
               operations:
                 - DELETE
       context:
-        # Policy-managed marker = originating policies recorded in status. On
-        # DELETE the object is in oldObject; fall back to object for testing.
-        # RestorePoint and RestorePointContent use different status sub-paths.
-        - name: originatingPolicies
+        # Policy-managed marker = the k10.kasten.io/policyName label, confirmed
+        # present on real RestorePoint/RestorePointContent objects (K10 8.5.12).
+        # On DELETE the object is in oldObject; fall back to object for testing.
+        - name: policyName
           variable:
             jmesPath: >-
-              (request.oldObject.status.restorePointContentDetails.originatingPolicies ||
-               request.object.status.restorePointContentDetails.originatingPolicies ||
-               request.oldObject.status.restorePointDetails.originatingPolicies ||
-               request.object.status.restorePointDetails.originatingPolicies)
-            default: []
-        # [unverified] originating Profile ref, taken from the first artifact
-        # that carries one. Confirm the exact meta sub-key (kanister vs
-        # dataservice) against a real RestorePointContent.
-        - name: profileName
-          variable:
-            jmesPath: >-
-              (request.oldObject.status.restorePointContentDetails.artifacts[].meta.*.profileRef.name | [0]) ||
-              (request.object.status.restorePointContentDetails.artifacts[].meta.*.profileRef.name | [0]) ||
-              (request.oldObject.status.restorePointDetails.artifacts[].meta.*.profileRef.name | [0]) ||
-              (request.object.status.restorePointDetails.artifacts[].meta.*.profileRef.name | [0])
+              (request.oldObject.metadata.labels."k10.kasten.io/policyName" ||
+               request.object.metadata.labels."k10.kasten.io/policyName")
             default: ""
+        # [best-effort, empty on 8.5.12] originating Profile ref, taken from the
+        # first artifact that carries one. Confirmed ABSENT in 8.5.12 status;
+        # retained for forward-compatibility with versions that populate it.
         - name: profileNamespace
           variable:
             jmesPath: >-
@@ -79,20 +74,32 @@ spec:
               (request.oldObject.status.restorePointDetails.artifacts[].meta.*.profileRef.namespace | [0]) ||
               (request.object.status.restorePointDetails.artifacts[].meta.*.profileRef.namespace | [0])
             default: "kasten-io"
-        # Resolve immutability from the originating Location Profile. In offline
-        # CLI tests this value is injected via the variables file, which
+        - name: profileName
+          variable:
+            jmesPath: >-
+              (request.oldObject.status.restorePointContentDetails.artifacts[].meta.*.profileRef.name | [0]) ||
+              (request.object.status.restorePointContentDetails.artifacts[].meta.*.profileRef.name | [0]) ||
+              (request.oldObject.status.restorePointDetails.artifacts[].meta.*.profileRef.name | [0]) ||
+              (request.object.status.restorePointDetails.artifacts[].meta.*.profileRef.name | [0])
+            default: ""
+        # Resolve immutability from the originating Location Profile. The live
+        # Profile uses spec.locationSpec.objectStore; spec.export.location.* is
+        # kept as a defensive secondary in case a profile variant uses it. In
+        # offline CLI tests this value is injected via the variables file, which
         # overrides the apiCall (no live cluster needed).
         - name: protectionPeriod
           apiCall:
             urlPath: "/apis/config.kio.kasten.io/v1alpha1/namespaces/{{ profileNamespace }}/profiles/{{ profileName }}"
-            jmesPath: "spec.export.location.objectStore.protectionPeriod || ''"
+            jmesPath: >-
+              spec.locationSpec.objectStore.protectionPeriod ||
+              spec.export.location.objectStore.protectionPeriod || ''
             default: ""
       # Only policy-managed restore points are in scope.
       preconditions:
         all:
-          - key: "{{ length(originatingPolicies) }}"
-            operator: GreaterThan
-            value: 0
+          - key: "{{ policyName }}"
+            operator: NotEquals
+            value: ""
       validate:
         message: >-
           Deletion denied: this RestorePoint/RestorePointContent is policy-managed

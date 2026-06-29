@@ -10,14 +10,16 @@ All content is anonymized and generic: example namespaces (`app-team-a`,
 identifiers. Sensitive-resource lists and allow-list labels are configurable.
 
 > **Project status: work in progress.**
-> CRD field paths have now been partially reconciled against a live cluster
-> (`oc explain`, Kasten CRDs dated 2025-12). Per-policy state is in the matrix
-> below (`verified` / `partially-verified` / `unverified`). The cluster has **no
-> Kasten-native admission webhook**, so the v9.0 admission Tech Preview path
-> (Scope B) could not be exercised end-to-end; Scope B policies still enforce via
-> Kyverno's own webhook. See [docs/RESEARCH.md](docs/RESEARCH.md) for the
-> reconciliation details and the remaining `oc` commands needed to close
-> policies 3, 4 and 5. Keep all policies in `Audit` until fully verified.
+> CRD field paths were reconciled against a live cluster in two passes:
+> `oc explain` (Kasten CRDs dated 2025-12) and a live **object dump**
+> (2026-06-29, **K10 8.5.12**). Per-policy state is in the matrix below
+> (`verified` / `partially-verified` / `unverified`). The lab runs **K10 8.5.12
+> (v8.x, not v9.0)** with **no admission webhooks** of any kind, so the v9.0
+> admission Tech Preview path (Scope B) cannot be exercised end-to-end there;
+> Scope B policies still enforce via Kyverno's own webhook. See
+> [docs/RESEARCH.md](docs/RESEARCH.md) for the reconciliation details, including
+> what policies 4 and 5 still need to close. Keep all policies in `Audit` until
+> fully verified.
 
 ## Status legend
 
@@ -25,7 +27,7 @@ identifiers. Sensitive-resource lists and allow-list labels are configurable.
 | --- | --- |
 | `[available]` | Targets Kasten v8.x resources (standard objects and the Kasten `Policy` CRD). The mechanism is supported today. |
 | `[preview]` | Targets Kasten v9.0 admission control on **Actions** and **RestorePoints**, which is a **Tech Preview** feature in v9.0. Requires the v9.0 admission webhook to be enabled for these resources. |
-| `[unverified]` | CRD field paths / JMESPath not yet confirmed against a live cluster. Applies to **all** policies in this repo at present. |
+| `[unverified]` | CRD field paths / JMESPath not yet confirmed against a live object. Now applies only to policy 4 (`spec.filters` is an opaque map and no live object populated it). |
 
 ## Policy matrix
 
@@ -33,9 +35,9 @@ identifiers. Sensitive-resource lists and allow-list labels are configurable.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | [require-policy-preset](require-policy-preset/) | A | `[available]` | verified | validate | Audit | `Policy` |
 | 2 | [require-resource-exclusions](require-resource-exclusions/) | A | `[available]` | verified | validate | Audit | `Policy` |
-| 3 | [require-expiry-on-manual-actions](require-expiry-on-manual-actions/) | B | `[preview]` | partially-verified (label TBD) | validate | Audit | `BackupAction`, `RunAction` |
-| 4 | [exclude-sensitive-on-restore](exclude-sensitive-on-restore/) | B | `[preview]` | unverified (filters is opaque map) | validate + mutate | Audit | `RestoreAction` |
-| 5 | [deny-immutable-restorepoint-deletion](deny-immutable-restorepoint-deletion/) | B | `[preview]` | corrected; profileRef path TBD | validate (deny on DELETE) | Audit | `RestorePoint`, `RestorePointContent` |
+| 3 | [require-expiry-on-manual-actions](require-expiry-on-manual-actions/) | B | `[preview]` | verified (policyName label) | validate | Audit | `BackupAction`, `RunAction` |
+| 4 | [exclude-sensitive-on-restore](exclude-sensitive-on-restore/) | B | `[preview]` | unverified (filters is opaque map; no populated object) | validate + mutate | Audit | `RestoreAction` |
+| 5 | [deny-immutable-restorepoint-deletion](deny-immutable-restorepoint-deletion/) | B | `[preview]` | corrected; label marker; profile unresolvable on v8.x | validate (deny on DELETE) | Audit | `RestorePoint`, `RestorePointContent` |
 | 6 | [forbid-cross-namespace-restore](forbid-cross-namespace-restore/) | B | `[preview]` | verified | validate | Audit | `RestoreAction` |
 
 **Scope A** — admission on standard Kubernetes objects and the Kasten `Policy`
